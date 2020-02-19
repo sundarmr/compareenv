@@ -1,0 +1,6 @@
+[drenv]
+fuse-002.local
+
+[drenv:vars]
+ansible_ssh_user=vagrant
+ansible_ssh_private_key_file="./.vagrant/machines/fuse-002.local/virtualbox/private_key"

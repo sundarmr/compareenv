@@ -1,0 +1,37 @@
+---
+
+ - name: copy the jar files
+   copy: src="{{copiedfile}}" dest="{{profileconfigdirectory}}"
+   register: copytask
+ 
+ - name: Give insecure permissions
+   file:
+    path: "{{profileconfigdirectory}}/production.json"
+    owner: root
+    group: root
+    mode: '1777'
+
+ - name: list details
+   shell: ./client -u admin -p admin "container-connect codecontainer  container-profile-list  '{{remoteprofileconfigfile}}'"  chdir="{{unarchivedpath}}/bin"
+   become: yes
+   register: containerlist
+
+
+ - name: debug message 
+   debug:  
+    msg: :"Commands to run {{containerlist.stdout_lines}}
+
+
+ - name: assign contatiners
+   shell: ./client -u admin -p admin "container-change-profile {{item}}" chdir="{{unarchivedpath}}/bin"
+   with_items: "{{containerlist.stdout_lines}}"
+   ignore_errors: yes
+
+ - name: context lists
+   shell: ./client -u admin -p admin "container-connect container1 context-list" chdir="{{unarchivedpath}}/bin"
+   become: yes
+   register: contextlist
+ 
+ - name: debug message
+   debug:
+    msg: :"Commands to run {{contextlist.stdout_lines}}

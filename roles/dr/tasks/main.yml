@@ -1,0 +1,148 @@
+---
+
+ - name: install java 1.8  
+   yum: name=java-1.7.0-openjdk state=present
+   register: installjava
+ 
+
+ - name: install unzip
+   yum: name=unzip state=present
+
+ - name: add jboss group
+   group: name="{{fuseusergroup}}" state=present
+
+ - name: add jboss user
+   user: name="{{fuseuser}}" group="{{fuseusergroup}}" home="{{fuseuserhome}}"
+
+ - name: copy the fuse archive
+   copy: src="{{softwaresource}}" dest="{{fuseinstalldir}}"
+   register: archive
+
+ - name: create directory for config file
+   file:
+    path: "/opt/jboss/profile"
+    state: directory
+    owner: jboss
+    group: jboss
+    mode: '077'
+
+ - name: unarchive fuse
+   unarchive: src="{{softwaredest}}" dest="{{fuseinstalldir}}" owner="{{fuseuser}}" group="{{fuseusergroup}}" copy=no
+   register: archive
+
+ - name: create repo directory
+   file:
+    path: "{{jarfiledest}}"
+    state: directory
+    owner: jboss
+    group: jboss
+    mode: '0777'
+
+ - name: copy the jar files
+   copy: src="{{jarfilesource}}" dest="{{jarfiledest}}"
+   register: copytask
+
+ - name: add fuse admin user
+   lineinfile: dest="{{unarchivedpath}}/etc/users.properties"
+     regexp='^admin=admin'
+     insertafter='^#admin=admin'
+     line='admin=admin,admin,manager,viewer,Monitor, Operator, Maintainer, Deployer, Auditor, Administrator, SuperUser'
+     state=present
+   when: archive.changed
+
+ - name: copy the fuse file
+   template: src=org.ops4j.pax.url.mvn.cfg   dest="{{unarchivedpath}}/etc/org.ops4j.pax.url.mvn.cfg" owner="{{fuseuser}}" group="{{fuseusergroup}}" backup=yes
+   register: copyfuseconfig
+
+ - name: start fuse
+   shell: ./start chdir="{{unarchivedpath}}/bin"
+   become: yes
+   become_user: jboss
+   async: 60
+   poll: 0
+   when: copyfuseconfig.changed
+
+ - name: wait for fuse to start
+   wait_for: port=8181 host=localhost delay=10
+   
+
+ - name: create fabric 
+   shell: ./client -u admin -p admin "fabric:create --wait-for-provisioning" chdir="{{unarchivedpath}}/bin"
+   register: fabriccreated
+
+ - name: create container
+   shell: ./client -u admin -p admin "container-create-child root {{ item }}" chdir="{{unarchivedpath}}/bin"
+   loop:
+    - container2
+    - codecontainer
+   ignore_errors: yes
+
+ - name: create profile
+   shell: ./client -u admin -p admin "profile-create {{ item }}" chdir="{{unarchivedpath}}/bin"
+   loop:
+     - sample
+     - sample1
+     - sample2
+     - codeprofile
+   ignore_errors: yes
+   register: createprofile
+
+ - name: change parents
+   shell: ./client -u admin -p admin "profile-change-parents {{  item }}  default fabric" chdir="{{unarchivedpath}}/bin"
+   loop:
+     - sample
+     - sample1
+     - sample2
+     - codeprofile
+   when: createprofile.changed
+
+ - name: edit profile
+   shell: ./client -u admin -p admin "fabric:profile-edit --pid io.fabric8.maven/localRepository=/opt/local/repo {{ item }} " chdir="{{unarchivedpath}}/bin"
+   loop:
+     - sample
+     - sample1
+     - sample2
+     - codeprofile
+
+ - name: add features
+   shell: ./client -u admin -p admin "fabric:profile-edit --features camel-blueprint {{ item }}" chdir="{{unarchivedpath}}/bin"
+   loop:
+     - sample
+     - sample1
+     - sample2
+     - codeprofile
+
+ - name: add features stream
+   shell: ./client -u admin -p admin "fabric:profile-edit --features camel-stream {{ item }}" chdir="{{unarchivedpath}}/bin"
+   loop:
+     - sample
+     - sample1
+     - sample2
+     - codeprofile
+
+ - name: add bundles to profile sample
+   shell: ./client -u admin -p admin "profile-edit --bundles {{ item }} sample" chdir="{{unarchivedpath}}/bin"
+   loop:
+    - mvn:com.google.code.gson/gson/2.8.5.redhat-00001
+
+ - name: add bundles to profile sample1
+   shell: ./client -u admin -p admin "profile-edit --bundles {{ item }} sample1" chdir="{{unarchivedpath}}/bin"
+   loop:
+    - mvn:com.google.code.gson/gson/2.8.5.redhat-00001
+
+ - name: add bundles to profile sample2
+   shell: ./client -u admin -p admin "profile-edit --bundles {{ item }} sample2" chdir="{{unarchivedpath}}/bin"
+   loop:
+    - mvn:com.google.code.gson/gson/2.8.5.redhat-00001
+
+ - name: add bundles to profile codeprofile
+   shell: ./client -u admin -p admin "profile-edit --bundles {{ item }} codeprofile" chdir="{{unarchivedpath}}/bin"
+   loop:
+     - mvn:com.google.code.gson/gson/2.8.5.redhat-00001
+     - "{{codebundle}}"
+
+ - name: asscoiate profile to container2
+   shell: ./client -u admin -p admin "container-change-profile container2 sample" chdir="{{unarchivedpath}}/bin"
+ 
+ - name: assocate profile tp codecontainer
+   shell: ./client -u admin -p admin "container-change-profile codecontainer codeprofile" chdir="{{unarchivedpath}}/bin"

@@ -1,0 +1,27 @@
+---
+
+softwaresource: /Users/smunirat/projects/fuse/jboss-fuse-karaf-6.3.0.redhat-187.zip
+fuseuserhome: /opt/jboss/fuse
+fuseuser: jboss
+fuseusergroup: jboss
+fuseinstalldir: /opt/jboss/fuse
+softwaredest: /opt/jboss/fuse/jboss-fuse-karaf-6.3.0.redhat-187.zip
+unarchivedpath: /opt/jboss/fuse/jboss-fuse-6.3.0.redhat-187
+amqdatastore: /opt/datastore
+amqservername: elavonbroker
+brokerip: 127.0.0.1
+fuseadminuser: admin
+fuseadminpassword: admin
+jarfilesource: /Users/smunirat/.m2/repository/org/redhat/fabric/profiledetails/1.19.17-SNAPSHOT/profiledetails-1.19.17-SNAPSHOT.jar
+jarfiledest: /opt/jboss/fuse/jboss-fuse-6.3.0.redhat-187/data/repository/org/redhat/fabric/profiledetails/1.19.17-SNAPSHOT
+filedest: /Users/smunirat/projects/server.json
+codebundle: mvn:org.redhat.fabric/profiledetails/1.19.17-SNAPSHOT
+productionconfigfile: /Users/smunirat/projects
+profileconfigdirectory: /opt/jboss/profile
+remoteprofileconfigfile: /opt/jboss/profile/production.json
+productioncontainers: [container1, container2, codecontainer]
+drcontainers: [container2, codecontainer]
+productionprofiles: [ sample, sample1, sample2, samplenotfound, codeprofile]
+drprofiles: [sample, sample1, codeprofile]
+codeprofilebundles: [ mvn:org.redhat.fabric/profiledetails/1.19.17-SNAPSHOT, mvn:com.google.code.gson/gson/2.8.5.redhat-00001 ]
+copiedfile: /Users/smunirat/projects/fuse-001.local/opt/jboss/profile/production.json

@@ -1,0 +1,18 @@
+---
+
+- hosts: production
+  gather_facts: no
+  become: yes
+  vars_files:
+    - groupvars/all
+  roles: 
+    - fuse
+
+#- hosts: drenv
+#  gather_facts: no
+#  become: yes
+#  vars_files:
+#    - groupvars/all
+#  roles:
+#    - fuse
+

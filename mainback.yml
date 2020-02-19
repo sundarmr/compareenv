@@ -1,0 +1,184 @@
+---
+
+ - name: install java 1.8  
+   yum: name=java-1.7.0-openjdk state=present
+   register: installjava
+ 
+ - name: set javahome
+   lineinfile: dest=/etc/profile regexp="^(export JAVA_HOME=)" state=present line="export JAVA_HOME=/usr/lib/jvm/java-1.7.0-openjdk-1.7.0.241-2.6.20.0.el7_7.x86_64/jre"
+#   when: installjava.results | selectattr("yumstate", "match", "installed") | list | length == 0
+
+ - name: install unzip
+   yum: name=unzip state=present
+
+ - name: add jboss group
+   group: name="{{fuseusergroup}}" state=present
+
+ - name: add jboss user
+   user: name="{{fuseuser}}" group="{{fuseusergroup}}" home="{{fuseuserhome}}"
+
+ - name: copy the fuse archive
+   copy: src="{{softwaresource}}" dest="{{fuseinstalldir}}"
+   register: archive
+
+
+ - name: create repo directory
+   file:
+    path: "{{jarfiledest}}"
+    state: directory
+    mode: '0777'
+
+ - name: create directory for config file
+   file:
+    path: "/opt/jboss/profile"
+    state: directory
+    mode: '077'
+
+ - name: copy old configuration file
+   copy: src="/Users/smunirat/projects/json/newjson.json" dest="/opt/jboss/profile/newjson.json"
+#   mode: '0777'
+ 
+ - name: create repo directory
+   file:
+    path: "/opt/jboss/fuse/jboss-fuse-6.3.0.redhat-187/data/repository/com/javacodegeeks/camel/camelHelloWorld/0.0.4-SNAPSHOT"
+    state: directory
+    mode: '0777'
+ 
+ - name: create second directory3
+   file:
+    path: "/opt/jboss/fuse/jboss-fuse-6.3.0.redhat-187/data/repository/com/javacodegeeks/camel/camelHelloWorld/0.0.5-SNAPSHOT"
+    state: directory
+    mode: '0777'
+ 
+ - name: copy the jar files
+   copy: src="{{jarfilesource}}" dest="{{jarfiledest}}"
+   register: copytask
+
+ - name: copy camel jar
+   copy: src="{{cameljarfile}}" dest="{{cameljardest}}"
+
+ - name: copy second jar
+   copy: src="/Users/smunirat/.m2/repository/com/javacodegeeks/camel/camelHelloWorld/0.0.5-SNAPSHOT/camelHelloWorld-0.0.5-SNAPSHOT.jar" dest="/opt/jboss/fuse/jboss-fuse-6.3.0.redhat-187/data/repository/com/javacodegeeks/camel/camelHelloWorld/0.0.5-SNAPSHOT"
+
+ - name: unarchive fuse
+   unarchive: src="{{softwaredest}}" dest="{{fuseinstalldir}}" owner="{{fuseuser}}" group="{{fuseusergroup}}" copy=no
+   when: copytask.changed
+   register: archive
+
+ - name: add fuse admin user
+   lineinfile: dest="{{unarchivedpath}}/etc/users.properties"
+     regexp='^admin=admin'
+     insertafter='^#admin=admin'
+     line='admin=admin,admin,manager,viewer,Monitor, Operator, Maintainer, Deployer, Auditor, Administrator, SuperUser'
+     state=present
+   when: archive.changed
+
+ - name: copy the fuse file
+   template: src=org.ops4j.pax.url.mvn.cfg   dest="{{unarchivedpath}}/etc/org.ops4j.pax.url.mvn.cfg" owner="{{fuseuser}}" group="{{fuseusergroup}}" backup=yes
+   register: copyfuseconfig
+
+ - name: start fuse
+   shell: ./start chdir="{{unarchivedpath}}/bin"
+   become: yes
+   become_user: jboss
+   async: 60
+   poll: 0
+   when: copyfuseconfig.changed
+
+ - name: wait for fuse to start
+   wait_for: port=8181 host=localhost delay=10
+   
+
+ - name: create fabric 
+   shell: ./client -u admin -p admin "fabric:create --wait-for-provisioning" chdir="{{unarchivedpath}}/bin"
+   register: fabriccreated
+
+ - name: create container
+   shell: ./client -u admin -p admin "container-create-child root {{ item }}" chdir="{{unarchivedpath}}/bin"
+   loop:
+    - container1
+    - container2
+   ignore_errors: yes
+
+ - name: create profile
+   shell: ./client -u admin -p admin "profile-create {{ item }}" chdir="{{unarchivedpath}}/bin"
+   loop:
+     - sample
+     - sample1
+   ignore_errors: yes
+   register: createprofile
+
+ - name: change parents
+   shell: ./client -u admin -p admin "profile-change-parents {{  item }}  default fabric" chdir="{{unarchivedpath}}/bin"
+   loop:
+     - sample
+     - sample1
+   when: createprofile.changed
+
+ - name: edit profile
+   shell: ./client -u admin -p admin "fabric:profile-edit --pid io.fabric8.maven/localRepository=/opt/local/repo {{ item }} " chdir="{{unarchivedpath}}/bin"
+   loop:
+     - sample
+     - sample1
+
+ - name: add features
+   shell: ./client -u admin -p admin "fabric:profile-edit --features camel-blueprint {{ item }}" chdir="{{unarchivedpath}}/bin"
+   loop:
+     - sample
+     - sample1
+
+ - name: add features stream
+   shell: ./client -u admin -p admin "fabric:profile-edit --features camel-stream {{ item }}" chdir="{{unarchivedpath}}/bin"
+   loop:
+     - sample
+     - sample1
+
+
+ - name: add bundles
+   shell: ./client -u admin -p admin "profile-edit --bundles {{ item }} sample" chdir="{{unarchivedpath}}/bin"
+   loop:
+    - mvn:com.google.code.gson/gson/2.8.5.redhat-00001
+    - mvn:com.sample.poc.fabric/profiledetails/1.0.0-SNAPSHOT  
+    #- mvn:com.javacodegeeks.camel/camelHelloWorld/0.0.4-SNAPSHOT
+
+ - name: add bundles
+   shell: ./client -u admin -p admin "profile-edit --bundles {{ item }} sample1" chdir="{{unarchivedpath}}/bin"
+   loop:
+    - mvn:com.google.code.gson/gson/2.8.5.redhat-00001
+    #- mvn:com.sample.poc.fabric/profiledetails/0.3.0-SNAPSHOT
+    #- mvn:com.javacodegeeks.camel/camelHelloWorld/0.0.5-SNAPSHOT
+
+ - name: associate profile to containers
+   shell: ./client -u admin -p admin "container-change-profile container1 sample1" chdir="{{unarchivedpath}}/bin"
+
+ - name: asscoiate profile to container1
+   shell: ./client -u admin -p admin "container-change-profile container2 sample" chdir="{{unarchivedpath}}/bin"
+
+ - name: list details
+   shell: ./client -u admin -p admin "container-connect container2 container-profile-list --containerslist list /opt/jboss/profile/newjson.json" > /opt/jboss/sample.json chdir="{{unarchivedpath}}/bin"
+   become: yes
+   register: containerlist
+
+ - name: copy the sample file
+   fetch:
+     src: /opt/jboss/sample.json
+     dest: /Users/smunirat/projects
+
+ - name: read last line 
+   shell: tail -n 1 "/opt/jboss/sample.json"
+   register: output
+
+ - name:  assign profiles
+   shell: ./client -u admin -p admin "container-connect container2 container-profile-list /Users/smunirat/projects/json/newjson.json" > /opt/jboss/sample.json chdir="{{unarchivedpath}}/bin"
+   register: containerprofilerelation
+
+ - name: assign contatiners
+   shell: ./client -u admin -p admin "container-change-profile {{item}}" chdir="{{unarchivedpath}}/bin"
+   with_items: "{{containerprofilerelation.stdout_lines}}"
+   ignore_errors: yes
+  
+ - name: stop containers
+   shell: ./client -u admin -p admin "container-stop {{ output.stdout_lines[0] }}" chdir="{{unarchivedpath}}/bin"
+ 
+ - name: start containers
+   shell: ./client -u admin -p admin "container-start {{ output.stdout_lines[0] }}" chdir="{{unarchivedpath}}/bin"

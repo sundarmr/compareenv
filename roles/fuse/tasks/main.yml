@@ -1,0 +1,23 @@
+---
+
+ - name: save configuration
+   shell: ./client -u admin -p admin "container-connect codecontainer container-profile-list" > "{{remoteprofileconfigfile}}" chdir="{{unarchivedpath}}/bin"
+   register: configcommand
+
+ - name: copy comnfig to local
+   fetch: 
+     src: "{{remoteprofileconfigfile}}"
+     dest: "{{productionconfigfile}}"
+
+
+ - name: remove unwanted lines
+   lineinfile: 
+        path: "{{copiedfile}}"
+        regexp: "^Connected"
+        state: absent
+        backup: yes
+
+ - name: copy config file to dr
+   copy: 
+    src: "{{copiedfile}}" 
+    dest: "{{profileconfigdirectory}}" 
